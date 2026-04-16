@@ -1,77 +1,69 @@
 name: Continuous Integration Pipeline with SonarQube
 
 on:
- workflow_dispatch
+  workflow_dispatch:
 
-# Define permissions for the workflow
 permissions:
- contents: read
- actions: read
- checks: write
- pull-requests: write
+  contents: read
+  actions: read
+  checks: write
+  pull-requests: write
 
 jobs:
- build-and-test:
-   runs-on: ubuntu-latest
-   environment: dev  
+  build-and-test:
+    runs-on: ubuntu-latest
+    environment: dev
 
-   steps:
-     - name: Checkout code
-       uses: actions/checkout@v4
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-     - name: Setup Node.js
-       uses: actions/setup-node@v4
-       with:
-         node-version: 18.x
-         cache: 'npm'
-         cache-dependency-path: 'package-lock.json'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18.x
+          cache: npm
+          cache-dependency-path: package-lock.json
 
-     - name: Install dependencies
-       run: npm ci
+      - name: Install dependencies
+        run: npm ci
 
-     - name: Build the application (optional)
-       run: |
-         npm run build 2>/dev/null || echo "No build script found, skipping build step"
+      - name: Build the application (optional)
+        run: npm run build --if-present
 
-     - name: Run unit tests with coverage and JUnit reports
-       env:
-         JEST_JUNIT_OUTPUT: coverage/junit.xml
-       run: npm run test:ci
+      - name: Run unit tests with coverage and JUnit reports
+        run: npm run test:ci
 
-     - name: Publish test results to Checks
-       uses: dorny/test-reporter@v1
-       if: always()
-       with:
-         name: Jest Test Results
-         path: coverage/junit.xml
-         reporter: jest-junit
-         fail-on-error: true
+      - name: Publish test results to Checks
+        if: always()
+        uses: dorny/test-reporter@v3
+        with:
+          name: Jest Test Results
+          path: coverage/junit.xml
+          reporter: jest-junit
+          fail-on-error: true
 
-     - name: Upload test results to GitHub
-       uses: actions/upload-artifact@v4
-       if: always()
-       with:
-         name: test-results-node
-         path: coverage/
-         retention-days: 30
+      - name: Upload test results to GitHub
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-node
+          path: coverage/
+          retention-days: 30
+          if-no-files-found: warn
 
-     - name: SonarQube Scan
-       uses: SonarSource/sonarqube-scan-action@v6.0.0
-       env:
-         SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-       with:
-         args: >
-           -Dsonar.projectKey=sample-node-app-saurabh
-           -Dsonar.organization=sda
-           -Dsonar.token=${{ secrets.SONAR_TOKEN }}
-           -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }}
-           -Dsonar.sources=.
-           -Dsonar.exclusions=node_modules/**,coverage/**,tests/**,**/*.test.js,**/*.spec.js
-           -Dsonar.tests=tests/
-           -Dsonar.test.inclusions=**/*.test.js,**/*.spec.js
-           -Dsonar.coverage.exclusions=node_modules/**,coverage/**,tests/**,**/*.test.js,**/*.spec.js
-
-     - name: Create deployment package
-       run: |
-         set -euo pipefail
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v6.0.0
+        env:
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.projectKey=sample-node-app-saurabh
+            -Dsonar.token=${{ secrets.SONAR_TOKEN }}
+            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }}
+            -Dsonar.sources=.
+            -Dsonar.exclusions=node_modules/**,coverage/**,tests/**,**/*.test.js,**/*.spec.js
+            -Dsonar.tests=tests/
+            -Dsonar.test.inclusions=**/*.test.js,**/*.spec.js
+            -Dsonar.coverage.exclusions=node_modules/**,coverage/**,tests/**,**/*.test.js,**/*.spec.js
